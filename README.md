@@ -12,7 +12,7 @@ Attention! To select protocols and build firmware, use Arduino IDE version 1.8.1
 ### Works in serial mode with
 * Jumper T12
 * OpenTX v2.3.15
-* Current Multiprotocol TX firmware v1.3.4.55
+* Current Multiprotocol TX firmware v1.3.4.58
 
 <img width=758 src=https://github.com/stanekTM/RX_nRF24_Stanek/blob/master/documents/opentx_multi_tx.png>
 
