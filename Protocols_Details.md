@@ -90,7 +90,7 @@ CFlie|AIR|38|CFlie||||||||NRF24L01|
 [Flysky](Protocols_Details.md#FLYSKY---1)||1|Flysky|V9x9|V6x6|V912|CX20||||A7105|
 [Flysky AFHDS2A](Protocols_Details.md#FLYSKY-AFHDS2A---28)||28|PWM_IBUS|PPM_IBUS|PWM_SBUS|PPM_SBUS|Gyro_Off|Gyro_On|Gyro_On_Rev||A7105|
 [Flysky AFHDS2A RX](Protocols_Details.md#FLYSKY-AFHDS2A-RX---56)||56|Multi|CPPM|||||||A7105|
-[FQ777](Protocols_Details.md#FQ777---23)||23|||||||||NRF24L01|SSV7241
+[FQ777](Protocols_Details.md#FQ777---23)||23|124|XBM37|||||||NRF24L01|SSV7241
 [FrskyD](Protocols_Details.md#FRSKYD---3)||3|D8|Cloned|||||||CC2500|
 [FrskyL](Protocols_Details.md#FRSKYL---67)||67|LR12|LR12 6CH|||||||CC2500|
 [FrskyR9](Protocols_Details.md#FRSKYR9---65)||65|FrskyR9|R9_915|R9_868||||||SX1276|
@@ -99,7 +99,7 @@ CFlie|AIR|38|CFlie||||||||NRF24L01|
 [FrskyX2](Protocols_Details.md#FRSKYX2---64)||64|CH_16|CH_8|EU_16|EU_8|Cloned|Cloned_8|||CC2500|
 [Frsky_RX](Protocols_Details.md#FRSKY_RX---55)||55|Multi|CloneTX|EraseTX|CPPM|||||CC2500|
 [Futaba/SFHSS](Protocols_Details.md#Futaba---21)||21|SFHSS||||||||CC2500|
-[FX](Protocols_Details.md#FX---58)||58|FX816|FX620|9630|Q560|QF012|BM26|FX818||NRF24L01|
+[FX](Protocols_Details.md#FX---58)||58|FX816|FX620|9630|Q560|QF012|BM26|A570||NRF24L01|
 [FY326](Protocols_Details.md#FY326---20)||20|FY326|FY319|||||||NRF24L01|
 [GD00X](Protocols_Details.md#GD00X---47)||47|GD_V1*|GD_V2*|||||||NRF24L01|XN297L
 [GW008](Protocols_Details.md#GW008---32)||32|||||||||NRF24L01|XN297
@@ -1871,7 +1871,7 @@ FX9630 and FX9603 Gyro: -100%=6G small throw, 0%=6G large throw, +100%=3D
 QIDI-550 Gyro: -100%=3D, 0%=6G, +100%=Torque
 
 ### Sub_protocol Q560 - *3*
-Model: QIDI-560
+Model: QIDI-560, QIDI-580 (Cirrus SR22)
 
 CH1|CH2|CH3|CH4|CH5|CH6|CH7
 ---|---|---|---|---|---|---
@@ -1879,7 +1879,8 @@ A|E|T|R|FLIP|GYRO|LEDs
 
 FLIP is a toggle channel meaning that -100% to +100% is a command and +100% to -100% is also a command
 
-Gyro: -100%=6G, 0%=3D+Gyro, +100%=3D
+- GYRO QIDI-560: -100%=6G, 0%=3D+Gyro, +100%=3D
+- GYRO QIDI-580: -100%=6G, 0%=6G+Inverted, +100%=3D+Gyro
 
 ### Sub_protocol QF012 - *4*
 Model: QF012 SBD Dauntless
@@ -1905,14 +1906,24 @@ A|E|T|R|FLIP|GYRO|LEDs|Turning Light switch|Calib
 
 Gyro: -100%=6G, 0%=3D+Gyro, +100%=3D
 
-### Sub_protocol FX818 - *6*
-Model: FX818/FX820/FX822/FX823
+### Sub_protocol A570 - *6*
+VTOL Model: Kootai A570, QIDI-570
 
-Telemetry supported. The plane sends a battery status of good->empty which is visible in A1 (good=4.2V->empty=3.1V) and RSSI gets a dummy value of 100.
+This model has no telemetry. Low battery indicated by model LED's turning flashing red.
 
-CH1|CH2|CH3|CH4
----|---|---|---
-A|-|T|-
+CH1|CH2|CH3|CH4|CH5|CH6|CH7|CH8|CH9|CH10|CH11|CH12
+---|---|---|---|---|---|---|---|---|---|---|---
+A|E|T|R|STOP|MODE|Rate|Color|LED-Off|TrimR|TrimA|TrimE
+
+ - STOP: -100% allows standard start / sticks moved down and center (Mode 2), +100% all motors stop
+ - MODE: -100%=Vertical hover, 0%=Flat flight, +100%=Vertical flight (Original TX will not allow motor start in Flat flight)
+ - Rate: -100%=Low Rate, +100%=High Rate
+ - Color: -100% / +100% toggles LED lights through color choices
+ - LED-Off: +100% switches lights OFF, -100% allows lights ON after a toggle of the color channel
+ - Trims: -100%=Rud-L,Ail-L,Ele-Back, +100%=Rud-R,Ail-R,Ele-Fwd, if used must be tied to momentary 3-pos switches
+ - (trim switches disabled in FM tab, added to trim channels 10,11,12 in mixes tab)
+
+Calibration: Same as original TX, model on level surface, TX bound, sticks lower left corners, LED's flashing
 
 ## FY326 - *20*
 
@@ -1927,11 +1938,28 @@ A|E|T|R|FLIP|RTH|HEADLESS|EXPERT|CALIBRATE
 Model: X6 FY319 Quadcopter (Needs Testing)
 
 ## FQ777 - *23*
+Autobind protocol
+
+### Sub_protocol 124 - *0*
 Model: FQ777-124 (with SV7241A)
 
 CH1|CH2|CH3|CH4|CH5|CH6|CH7|CH8
 ---|---|---|---|---|---|---|---
 A|E|T|R|FLIP|RTH|HEADLESS|EXPERT
+
+### Sub_protocol XBM37 - *1*
+Model: T-Smart XBM-37 (with SV7241A)
+
+CH1|CH2|CH3|CH4|CH5|CH6|CH7|CH8|CH9|CH10|CH11|CH12|CH13|CH14
+---|---|---|---|---|---|---|---|---|---|---|---|---|---
+A|E|T|R|RATE|FLIP|HEADLESS|LED|PICTURE|VIDEO|RTH|OK|ETrim|Atrim
+
+ - RATE: -100% Low, 0% Mid, +100% High
+ - CH6 to CH12 are OFF/-100 and ON/+100 exception LED is OFF/+100
+ - Receiver numbers (0-63) available for model match, MPM global ID used for unique module identifier.
+ - Changing the TX module or RX number will require re-binding the receiver.
+ 
+Calibration: Set quad on level surface, pull both sticks down in outer corners until LED's flash (Mode-2 TX)
 
 ## GW008 - *32*
 Model: Global Drone GW008 from Banggood
