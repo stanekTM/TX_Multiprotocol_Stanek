@@ -102,7 +102,7 @@ static void __attribute__((unused)) DSM_build_bind_packet()
 	if(sub_protocol==DSM_AUTO)
 		packet[11] = 12;
 	else
-		packet[11] = num_ch;				// DX5 DSMR sends 0x48...
+		packet[11] = min(num_ch,12);		// DX5 DSMR sends 0x48...
 	//packet[11] = 3;						// DX3R
 
 	if (sub_protocol==DSMR)
@@ -142,10 +142,13 @@ static void __attribute__((unused)) DSM_initialize_bind_phase()
 static void __attribute__((unused)) DSM_update_channels()
 {
 	prev_option=option;
-	num_ch=option & 0x0F;				// Remove flags 0x80=max_throw, 0x40=11ms
+	num_ch=option & 0x0F;					// Remove flags 0x80=max_throw, 0x40=11ms, 0x20=Cloned
+
+	if (num_ch==0)							// Special case for 16ch, since channels are encoded in lower 4 bits, 0=16 channels
+		num_ch=16;
 
 	if(num_ch<3)
-		num_ch=6;						// Default to 6 channels if invalid choice...
+		num_ch=6;							// Default to 6 channels if invalid choice...
 
 	#ifndef MULTI_AIR
 		if(sub_protocol==DSMR && num_ch>7)
@@ -329,7 +332,7 @@ uint16_t DSM_callback()
 	#define DSM_CH1_CH2_DELAY	4010			// Time between write of channel 1 and channel 2
 	#ifdef STM32_BOARD
 		#define DSM_WRITE_DELAY		1600		// Time after write to verify write complete
-		#define DSM_READ_DELAY		300			// Time before write to check read phase, and switch channels.
+		#define DSM_READ_DELAY		400			// Time before write to check read phase, and switch channels.
 	#else
 		#define DSM_WRITE_DELAY		1950		// Time after write to verify write complete
 		#define DSM_READ_DELAY		600			// Time before write to check read phase, and switch channels.
@@ -499,7 +502,7 @@ uint16_t DSM_callback()
 						else
 							return DSM2_SFC_PERIOD - DSM_CH1_CH2_DELAY - DSM_WRITE_DELAY - DSM_READ_DELAY;
 					}
-					return 10900 - DSM_WRITE_DELAY - DSM_READ_DELAY;	//Was 11000 but the SR6200A needs 10900 to report telemetry correctly
+					return 11000 - DSM_WRITE_DELAY - DSM_READ_DELAY;	//Was 11000 but the SR6200A needs 10900 to report telemetry correctly
 				}
 			#endif
 			return 11000 - DSM_CH1_CH2_DELAY - DSM_WRITE_DELAY - DSM_READ_DELAY;
