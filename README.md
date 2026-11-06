@@ -1,10 +1,10 @@
 ## Support for custom RC receivers
-... from this repository [**RX_nRF24_Stanek**](https://github.com/stanekTM/RX_nRF24_Stanek)
+... from this repository [**RX_nRF24_FHSS**](https://github.com/stanekTM/RX_nRF24_FHSS)
 
 The [**Stanek**](Multiprotocol/STANEK_nrf24l01.ino) protocol with the nRF24L01+ transceiver is included.
 Telemetry monitors receiver voltage A1(A2) and "fake" RSSI.
 The nRF24L01+ transceiver does not contain real RSSI and is only a rough counting of lost packets.
-* Setting the number of channels in the option selection (2 to 13 channels).
+* Setting the number of channels in the option selection (2 to 14 channels).
 * Fail-safe flag in bind option "Bnd".
 
 Attention! To select protocols and build firmware, use Arduino IDE version 1.8.19. Compiling with Arduino IDE version 2... has errors (I will investigate later).
@@ -14,7 +14,7 @@ Attention! To select protocols and build firmware, use Arduino IDE version 1.8.1
 * OpenTX v2.3.15
 * Current Multiprotocol TX firmware v1.3.4.74
 
-<img width=758 src=https://github.com/stanekTM/RX_nRF24_Stanek/blob/master/documents/opentx_multi_tx.png>
+<img width=758 src=https://github.com/stanekTM/RX_nRF24_FHSS/blob/master/documents/opentx_multi_tx.png>
 
 #
 # Multiprotocol TX Module
