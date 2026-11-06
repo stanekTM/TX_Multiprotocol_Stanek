@@ -1,222 +1,210 @@
 /*
-  This project is free software: you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation, either version 3 of the License, or
-  (at your option) any later version.
-
-  Multiprotocol is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
-  
-  You should have received a copy of the GNU General Public License
-  along with Multiprotocol.  If not, see http://www.gnu.org/licenses.
+******************************************************************************************************
+Simple RF protocol with frequency hopping (FHSS) and two-way telemetry (Auto-ACK Payload).
+******************************************************************************************************
+Rapid hopping between 4 strong RF channels (12, 40, 76, 88) outside the main WiFi frequencies.
+Transmission rate of 1 Mbps (increased for full support of the newer nRF52 generation).
+Constant latency / period of 4.5 ms (222 Hz).
+The received telemetry displays the A1(A2) voltage and RSSI.
+By selecting the "Options" in the model settings menu, select the number of RC channels from 2 to 14.
+By selecting the "Bnd" bind option in the model settings menu, we save the Fail-Safe servo positions
+to the receiver.
+Support for DIY receivers from this repository: https://github.com/stanekTM/RX_nRF24_FHSS
+******************************************************************************************************
 */
-
-/*
-  **************************************************************************************************
-  Support for DIY receivers from this repository:
-  https://github.com/stanekTM/RX_nRF24_Stanek
-  
-  The "Stanek" protocol with the nRF24L01+ transceiver is included.
-  Telemetry monitors receiver voltage A1(A2) and "fake" RSSI.
-  The nRF24L01+ transceiver does not contain real RSSI and is only a rough counting of lost packets.
-  
-  - Setting the number of channels in the option selection (2 to 13 channels).
-  - Fail-safe flag in bind option "Bnd".
-  **************************************************************************************************
-*/
-
 
 #if defined(STANEK_NRF24L01_INO)
 
 #include "iface_nrf24l01.h"
 
+// Unikátní RF adresa max. 5 bajtů (číslo nebo znak). Musí být stejná i v přijímači
+const uint8_t STANEK_RF_ADDRESS[] = "jirka";
 
-uint8_t STANEK_TX_RX_Address[] = "jirka"; // Unique address (5 bytes number or character)
+// 4 silné RF kanály (mimo hlavní WiFi frekvence)
+const uint8_t STANEK_RF_CHANNELS[] = {12, 40, 76, 88};
+uint8_t fhss_index = 0; // Ukazatel na aktuálně používaný RF kanál z tabulky
 
-#define STANEK_RF_CHANNEL      76         // RF channel 0 to 125 (2.4GHz to 2.525GHz)
+// Délka jednoho vysílacího / přijímacího okna v mikrosekundách
+#define STANEK_PACKET_PERIOD  4500 // Pevná odesílací / přijímací perioda 4.5 ms (222 Hz)
 
-#define STANEK_PACKET_PERIOD   3000       // In microseconds
+// Prototypy všech funkcí pro správné sestavení kompilátorem (mimo STANEK_callback a STANEK_init)
+static void STANEK_RF_init();
+static void STANEK_send_packet();
+static void STANEK_get_telemetry();
 
 //**********************************************************************************************************************************
-// STANEK_RF_init
+// Kompletní inicializace registrů nRF24L01+
 //**********************************************************************************************************************************
 static void __attribute__((unused)) STANEK_RF_init()
 {
-  NRF24L01_WriteRegisterMulti(NRF24L01_10_TX_ADDR,    (uint8_t*)(&STANEK_TX_RX_Address), 5);
-  NRF24L01_WriteRegisterMulti(NRF24L01_0A_RX_ADDR_P0, (uint8_t*)(&STANEK_TX_RX_Address), 5);
-  
-  NRF24L01_FlushTx();
-  NRF24L01_FlushRx();
-  
+  // 1. Hardwarový reset (uvede čip do předem známého výchozího stavu)
   NRF24L01_Initialize();
   
-  NRF24L01_WriteReg(NRF24L01_01_EN_AA, 0x00); // 0x00 Disable auto acknowledgement on all data pipes
-  //                                             0x3F Enable auto acknowledgement on all data pipes
-  //                                             0x01 Enable auto acknowledgement data pipe 0
+  // 2. Vyčistit případné staré nebo poškozené pakety z FIFO front po resetu
+  NRF24L01_FlushTx(); // Vyčistit vysílací vyrovnávací paměť (TX FIFO)
+  NRF24L01_FlushRx(); // Vyčistit přijímací vyrovnávací paměť (RX FIFO)
   
-  NRF24L01_WriteReg(NRF24L01_02_EN_RXADDR, 0x3F); // 0x3F Enable all data pipes
-  //                                                 0x01 Enable data pipe 0 only
-                                                   
-  NRF24L01_WriteReg(NRF24L01_03_SETUP_AW, 0x03); // 5 bytes RX/TX address field width
+  // 3. Zápis adres a aktivace datových kanálů (Pipe 0 je nutná pro zachycení zpětné telemetrie)
+  NRF24L01_WriteRegisterMulti(NRF24L01_10_TX_ADDR,    (uint8_t*)(&STANEK_RF_ADDRESS), 5);
+  NRF24L01_WriteRegisterMulti(NRF24L01_0A_RX_ADDR_P0, (uint8_t*)(&STANEK_RF_ADDRESS), 5);
+  NRF24L01_WriteReg(NRF24L01_02_EN_RXADDR, 0x01); // Povolit pouze datový kanál Pipe 0 (pro příjem dat)
+  NRF24L01_WriteReg(NRF24L01_03_SETUP_AW, 0x03); // Šířka adresy 5 bajtů
   
-  NRF24L01_WriteReg(NRF24L01_04_SETUP_RETR, 0x55); // 0x55 1500us (5 * 250us + 250us) delay, 5 * retries
-  //                                                  0xFF 4000us (15 * 250us + 250us) delay, 15 * retries
-  //                                                  0x00 Disable retransmits
+  // 4. Protokolární konfigurace (řízení přenosových vlastností)
+  NRF24L01_WriteReg(NRF24L01_01_EN_AA, 0x01); // Zapnuto hardwarové Auto-ACK na Pipe 0 pro příjem potvrzení a telemetrie
+  NRF24L01_WriteReg(NRF24L01_04_SETUP_RETR, 0x00); // Vypnuto automatické opakování paketů (zajišťuje nulovou latenci)
+  NRF24L01_SetBitrate(NRF24L01_BR_1M); // Nastavení střední rychlosti 1 Mbps (250 kbps nRF52832 nepodporuje)
+  NRF24L01_WriteReg(NRF24L01_05_RF_CH, STANEK_RF_CHANNELS[fhss_index]); // Nastavení startovního RF kanálu z FHSS tabulky
   
-  NRF24L01_SetBitrate(NRF24L01_BR_250K); // 250Kbps
+  // 5. Odemčení a zápis pokročilých funkcí (dynamická délka dat a ACK payload)
+  //NRF24L01_Activate(0x73); // 1. Odemknout přístup k pokročilým registrům (DYNPD, FEATURE)
+  NRF24L01_WriteReg(NRF24L01_1C_DYNPD, 0x01); // Povolení příjmu paketů s proměnlivou (dynamickou) délkou pouze pro Pipe 0
+  NRF24L01_WriteReg(NRF24L01_1D_FEATURE, 0x06); // Bit 0x04 zapíná Dynamic Payload, bit 0x02 zapíná funkci ACK Payload (přibalování telemetrie)
+  //NRF24L01_Activate(0x73); // 2. Zamknout registry pro zajištění stability (DYNPD, FEATURE). Zakomentovat v případě klonu
   
-  NRF24L01_WriteReg(NRF24L01_1C_DYNPD, 0x3F); // 0x3F Enable Dynamic Payload Length on all data pipes
-  //                                             0x01 Enable Dynamic Payload Length on data pipe 0
+  // 6. Vyčistit všechny stavové flagy (RX_DR, TX_DS, MAX_RT)
+  NRF24L01_WriteReg(NRF24L01_07_STATUS, 0x70);
   
-  NRF24L01_WriteReg(NRF24L01_1D_FEATURE, 0x04); // 0x04 Enable Dynamic Payload Length
-  //                                               0x06 Enable Dynamic Payload Length, enable Payload with ACK
-  //                                               0x07 Enable all features
+  // 7. Finální spuštění modulu
+  NRF24L01_SetPower(); // Zapnout napájení a zápis RF výkonu (nastaví RF_SETUP)
+  NRF24L01_SetTxRxMode(TX_EN); // Zapnout vysílací režim
   
-  NRF24L01_SetPower();
-  NRF24L01_SetTxRxMode(TX_EN); // Clear data ready, data sent, retransmit and enable CRC 16 bits, ready for TX
-  
-  delayMilliseconds(10);
+  delayMilliseconds(10); // Čas pro nastavení registrů
 }
 
 //**********************************************************************************************************************************
-// STANEK_get_telemetry
+// Asynchronní příjem zpětných dat z modelu a vyhodnocování kvality signálu linky
 //**********************************************************************************************************************************
 static void __attribute__((unused)) STANEK_get_telemetry()
-{
-  // Calculate TX RSSI based on past 250 expected telemetry packets.
-  // Cannot use full second count because telemetry_counter is not large enough
-  state++;
-  
-  if (state > 250)
+{  
+  // Měření TSSI: Okno pro 100 očekávaných paketů jednou za 250 cyklů
+  if (++state > 250)
   {
-    TX_RSSI = telemetry_counter;
-    telemetry_counter = 0;
-    state = 0;
-    telemetry_lost = 0;
+    // Pojistka proti přetečení
+    //if (telemetry_counter > 100) telemetry_counter = 100;
+    // Počet paketů (0 až 100) je přímo výsledné procento
+    //TX_RSSI = telemetry_counter; // Zápis TSSI (kvality odesílání) do telemetrie zpětné vazby OpenTX / EdgeTX
+    
+    // Přenásobením koeficientem 1.6 získáme při plném signálu hodnotu 200 (125 * 1.6 = 200)
+    uint16_t tssi_scaled = ((uint16_t)telemetry_counter * 16) / 10;
+    
+    // Pojistka proti přetečení
+    if (tssi_scaled > 200) tssi_scaled = 200;
+    
+    // Počet paketů (0 až 200) se v OpenTX / EdgeTX zobrazí jako 0 až 100 %
+    TX_RSSI = tssi_scaled; // Zápis TSSI (kvality odesílání) do telemetrie zpětné vazby OpenTX / EdgeTX
+    
+    state = 0; // Vynulování děliče cyklů
+    telemetry_counter = 0; // Vynulování počítadla úspěšně přijatých paketů
+    telemetry_lost = 0; // Vynulování ztráty telemetrického spojení
   }
   
-  // Process received telemetry packet
+  // Vyčteme aktuální stav registru STATUS
+  //uint8_t status_reg = NRF24L01_ReadReg(NRF24L01_07_STATUS);
+  
+  // Pokud je nastaven bit 6 (RX_DR), znamená, že v rámci Auto-ACK hardwarově dorazil telemetrický paket od přijímače
+  //if (status_reg & (1 << 6))
   if (NRF24L01_ReadReg(NRF24L01_07_STATUS) & _BV(NRF24L01_07_RX_DR))
   {
-    // Read telemetry data
-    NRF24L01_ReadPayload(packet, 3);
+    NRF24L01_ReadPayload(packet, 3); // Vyčteme 3 bajty telemetrie z RX FIFO paměti čipu
     
-    RX_RSSI = packet[0]; // Packet rate 0 to 255 where 255 is 100% packet rate
-    v_lipo1 = packet[1]; // Directly from analog input of receiver, but reduced to 8 bit depth (0 to 255)
-    v_lipo2 = packet[2]; // Directly from analog input of receiver, but reduced to 8 bit depth (0 to 255)
+    RX_RSSI = packet[0]; // 1.bajt: Síla signálu (RSSI) na straně přijímače (0 až 255)
+    v_lipo1 = packet[1]; // 2.bajt: Analogový senzor A1 napětí baterie (0 až 255)
+    v_lipo2 = packet[2]; // 3.bajt: Analogový senzor A2 napětí baterie (0 až 255)
     
-    telemetry_counter++;
+    telemetry_counter++; // Navýšení počtu přijatých paketů do statistiky TSSI
     
-    if (telemetry_lost == 0)
-    {
-      telemetry_link = 1;
-    }
-  }
-  else
-  {
-    // If no telemetry packet was received then delay by the typical telemetry packet processing time.
-    // This is done to try to keep the STANEK_send_packet process timing more consistent. Since the SPI payload read takes some time
-    delayMicroseconds(50);
+    // Ztráta telemetrického spojení
+    if (telemetry_lost == 0) telemetry_link = 1; // Aktivujeme příznak, že telemetrické spojení je plně aktivní
   }
   
-  NRF24L01_SetTxRxMode(TX_EN);
-  NRF24L01_FlushRx();
+  NRF24L01_SetTxRxMode(TX_EN); // Okamžitě vypni příjem a zapni vysílání
+  NRF24L01_FlushRx(); // Vyčistit přijímací vyrovnávací paměť (RX FIFO) pro čistý start příštího kola
 }
 
 //**********************************************************************************************************************************
-// STANEK_send_packet
+// Sestavení dat a odeslání paketu
 //**********************************************************************************************************************************
 static void __attribute__((unused)) STANEK_send_packet()
 {
+  // Okamžitě na začátku cyklu stáhneme telemetrická data z minulého kola
   STANEK_get_telemetry();
   
-  // Setting the number of channels in the option selection (2 to 13 channels)
-  //switch (sub_protocol)
-  //switch (RX_num)
-  switch (option)
-  {
-    case 0: num_ch = 2; break;
-    case 1: num_ch = 2; break;
-    case 2: num_ch = 2; break;
-    case 3: num_ch = 3; break;
-    case 4: num_ch = 4; break;
-    case 5: num_ch = 5; break;
-    case 6: num_ch = 6; break;
-    case 7: num_ch = 7; break;
-    case 8: num_ch = 8; break;
-    case 9: num_ch = 9; break;
-    case 10: num_ch = 10; break;
-    case 11: num_ch = 11; break;
-    case 12: num_ch = 12; break;
-    case 13: num_ch = 13; break;
-  }
+  // Určení počtu RC kanálů v menu nastavení modelu "Možnosti"
+  int8_t signed_option = (int8_t)option; // Přetypováním na (int8_t) zajistíme, že procesor uvidí záporné hodnoty správně
   
-  // Fail-safe flag in bind option "Bnd"
+  if (signed_option < 2) num_ch = 2; // Cokoli pod hodnotu 2 zafixujeme
+  else if (signed_option > 14) num_ch = 14; // Cokoli nad hodnotu 14 zafixujeme
+  else num_ch = signed_option; // Počet RC kanálů v přesném rozsahu 2 až 14
+  
+  // Pokud aktivujeme párování "Bnd" (příznak Fail-Safe)
   if (IS_BIND_IN_PROGRESS)
   {
-    packet[0] = 1;
+    packet[0] = 1; // Zapneme příznak Fail-Safe v paketu na indexu 0
     
-    if (bind_counter++ == 550) BIND_DONE;
+    // Po 3 sekundách (667 průchodů při 4.5 ms periodě) ukončete párování "Bnd"
+    if (bind_counter++ == 667) BIND_DONE;
   }
-  else packet[0] = 0;
+  // Párování "Bnd" neběží
+  else 
+  {
+    packet[0] = 0; // Vypneme příznak Fail-Safe v paketu na indexu 0
+    bind_counter = 0; // Vynulujeme počítadlo
+  }
   
-  uint8_t payload_index = 0;
+  // Sestavení payloadu (2 bajty na jeden RC kanál). Na indexu 0 je příznak Fail-Safe
+  uint8_t payload_index = 1; // Plnění RC kanálů začíná přesně od indexu 1
   
   for (uint8_t i = 0; i < num_ch; i++)
   {
-    uint16_t hold_value = convert_channel_16b_limit(i, 1000, 2000); // Valid channel values are 1000 to 2000
+    uint16_t hold_value = convert_channel_16b_limit(i, 1000, 2000); // Konverze výchylek páček na limitovaný rozsah (1000 až 2000 us)
     
-    packet[1 + payload_index] = hold_value & 0x00FF;
-    payload_index++;
-    packet[1 + payload_index] = hold_value >> 8;
-    payload_index++;
+    packet[payload_index++] = hold_value & 0x00FF; // Spodní (Low) bajt
+    packet[payload_index++] = hold_value >> 8;     // Horní (High) bajt
   }
   
-  uint8_t packet_size = (num_ch * 2) + 1; // For one control channel with a value of 1000 to 2000 we need 2 bytes(packets)
+  // Velikost paketu: 1 bajt (příznak Fail-Safe) na indexu 0 + 2 bajty na RC kanál
+  uint8_t packet_size = 1 + (num_ch * 2);
   
-  // Set RF channel and send data
-  NRF24L01_WriteReg(NRF24L01_05_RF_CH, STANEK_RF_CHANNEL);
+  // 1. Synchronní skok na další RF kanál
+  fhss_index = (fhss_index + 1) % 4; // Posun na další index v tabulce
+  NRF24L01_WriteReg(NRF24L01_05_RF_CH, STANEK_RF_CHANNELS[fhss_index]); // Nastavení RF kanálu na novou frekvenci
+  
+  // 2. Vyčistit stavové flagy a vyprázdnit paměť před novým zápisem
+  NRF24L01_WriteReg(NRF24L01_07_STATUS, 0x70); // Vyčistit všechny předchozí stavové flagy (TX_DS, MAX_RT, RX_DR)
+  NRF24L01_FlushTx(); // Vyčistit vysílací vyrovnávací paměť (TX FIFO)
+  
+  // 3. Zapnout napájení a zápis RF výkonu (nastaví RF_SETUP)
   NRF24L01_SetPower();
+  
+  // 4. Zápis sestavených dat
   NRF24L01_WritePayload(packet, packet_size);
   
-  
-  // Switch radio to RX as soon as packet is sent.
-  // Calculate transmit time based on packet size and data rate of 250Kbs per sec.
-  // This is done because polling the status register during xmit caused issues.
-  // bits = packet_size * 8  +  73 bits overhead at 250Kbps per sec, one bit is 4us
-  // then add 140us which is 130us to begin the xmit and 10us fudge factor
-  delayMicroseconds(((((unsigned long)packet_size * 8ul) + 73ul) * 4ul) + 140ul); // 560us -> 1200us
-  
-  // Increase packet period by 100us for each channel over 6
-  packet_period = STANEK_PACKET_PERIOD + (constrain(((int16_t)num_ch - (int16_t)6), (int16_t)0, (int16_t)10) * (int16_t)100);
-  
-  NRF24L01_WriteReg(NRF24L01_00_CONFIG, 0x7F); // 0x7F RX mode with 16 bit CRC no IRQ
-  //                                              0x0F RX mode with 16 bit CRC
+  // 5. Trvalé vynucení vysílacího režimu (PWR_UP, PRIM_TX, 2B CRC)
+  NRF24L01_WriteReg(NRF24L01_00_CONFIG, 0x7E);
 }
 
 //**********************************************************************************************************************************
-// STANEK_callback
+// Pravidelný hardwarový callback volaný operačním systémem RC vysílače
 //**********************************************************************************************************************************
 uint16_t STANEK_callback()
 {
-  STANEK_send_packet();
+ #ifdef MULTI_SYNC
+  telemetry_set_input_sync(STANEK_PACKET_PERIOD); // Synchronizuje hodiny OpenTX / EdgeTX s rádiem před odesláním dat
+ #endif
   
-#ifdef MULTI_SYNC
-  telemetry_set_input_sync(packet_period);
-#endif
+  STANEK_send_packet(); // Odeslání aktuálního paketu k modelu
   
-  return packet_period; // Packet_period is set/adjusted in STANEK_send_packet
+  return STANEK_PACKET_PERIOD; // Vrácení pevné periody 4500 us (4.5 ms)
 }
 
 //**********************************************************************************************************************************
-// STANEK_init
+// Inicializace protokolu STANEK volaná jádrem Multiprotokolu při startu / přepnutí modelu
 //**********************************************************************************************************************************
 void STANEK_init(void)
 {
-  STANEK_RF_init();
+  fhss_index = 0; // Nastavení startovního RF kanálu z FHSS tabulky
+  STANEK_RF_init(); // Kompletní inicializace registrů nRF24L01+
 }
 
-#endif // End STANEK_NRF24L01_INO
- 
+#endif // Konec STANEK_NRF24L01_INO
