@@ -1,16 +1,17 @@
 /*
-******************************************************************************************************
+***********************************************************************************************
 Simple RF protocol with frequency hopping (FHSS) and two-way telemetry (Auto-ACK Payload).
-******************************************************************************************************
+***********************************************************************************************
 Rapid hopping between 4 strong RF channels (12, 40, 76, 88) outside the main WiFi frequencies.
 Transmission rate of 1 Mbps (increased for full support of the newer nRF52 generation).
 Constant latency / period of 4.5 ms (222 Hz).
 The received telemetry displays the A1(A2) voltage and RSSI.
-By selecting the "Options" in the model settings menu, select the number of RC channels from 2 to 14.
-By selecting the "Bnd" bind option in the model settings menu, we save the Fail-Safe servo positions
-to the receiver.
+
+* The bind "Bnd" function saves the Fail-Safe positions for the servos into the receiver.
+* Number of RC channels in the “Option” menu. Select a value from 2 to 14.
+
 Support for DIY receivers from this repository: https://github.com/stanekTM/RX_nRF24_FHSS
-******************************************************************************************************
+***********************************************************************************************
 */
 
 #if defined(STANEK_NRF24L01_INO)
