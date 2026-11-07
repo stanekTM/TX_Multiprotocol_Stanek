@@ -1,19 +1,18 @@
-## Support for custom RC receivers
-... from this repository [**RX_nRF24_FHSS**](https://github.com/stanekTM/RX_nRF24_FHSS)
+# Custom FHSS protocol for DIY-Multiprotocol-TX-Module
 
-The [**Stanek**](Multiprotocol/STANEK_nrf24l01.ino) protocol with the nRF24L01+ transceiver is included.
-Telemetry monitors receiver voltage A1(A2) and "fake" RSSI.
-The nRF24L01+ transceiver does not contain real RSSI and is only a rough counting of lost packets.
+Simple RF protocol [**Stanek**](Multiprotocol/STANEK_nrf24l01.ino) with frequency hopping (FHSS) and two-way telemetry (Auto-ACK Payload) for the nRF24L01+ transceiver.
 
-* The bind "Bnd" function saves the Fail-Safe positions for the servos into the receiver.
-* Number of RC channels in the “Option” menu. Select a value from 2 to 14.
+* Rapid hopping between 4 strong RF channels (12, 40, 76, 88) outside the main WiFi frequencies.
+* Transmission rate of 1 Mbps (increased for full support of the newer nRF52 generation).
+* Constant latency / period of 4.5 ms (222 Hz).
+* The received telemetry displays the A1(A2) voltage and RSSI.
 
-Attention! To select protocols and build firmware, use Arduino IDE version 1.8.19. Compiling with Arduino IDE version 2... has errors (I will investigate later).
+  * The bind "Bnd" function saves the Fail-Safe positions for the servos into the receiver.
+  * Number of RC channels in the “Option” menu. Select a value from 2 to 14.
 
-### Works in serial mode with
-* Jumper T12
-* OpenTX v2.3.15
-* Current Multiprotocol TX firmware v1.3.4.74
+Support for custom DIY RC receivers from this repository [**RX_nRF24_FHSS**](https://github.com/stanekTM/RX_nRF24_FHSS)
+
+**Attention!** To select protocols and build firmware, use Arduino IDE version 1.8.19. Compiling with Arduino IDE version 2... has errors (I will investigate later).
 #
 
 # Multiprotocol TX Module
