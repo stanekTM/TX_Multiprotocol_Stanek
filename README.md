@@ -8,7 +8,7 @@ Added simple RF protocol [**Stanek**](Multiprotocol/STANEK_nrf24l01.ino) with fr
 * The received telemetry displays the A1(A2) voltage and RSSI.
 
   * The bind "Bnd" function saves the Fail-Safe positions for the servos into the receiver.
-  * Number of RC channels in the “Option” menu. Select a value from 2 to 14.
+  * Set the number (2 to 14) of RC channels in the "Option" menu.
 
 Support for custom DIY RC receivers from this repository [**RX_nRF24_FHSS**](https://github.com/stanekTM/RX_nRF24_FHSS)
 
