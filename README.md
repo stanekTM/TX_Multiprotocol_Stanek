@@ -13,16 +13,6 @@ Attention! To select protocols and build firmware, use Arduino IDE version 1.8.1
 * Jumper T12
 * OpenTX v2.3.15
 * Current Multiprotocol TX firmware v1.3.4.74
-
-[documents/opentx_multi_tx.PNG](https://github.com/stanekTM/RX_nRF24_FHSS/blob/main/documents/opentx_multi_tx.PNG)
-
-<table border="0">
-<tr>
-<td width="50%">
-<img src="https://github.com/stanekTM/RX_nRF24_FHSS/blob/main/documents/opentx_multi_tx.PNG" alt="opentx_multi_tx.PNG" width="100%">
-</td>
-</tr>
-</table>
 #
 # Multiprotocol TX Module
 <img align="right" width=300 src="docs/images/multi.png" />
