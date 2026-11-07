@@ -4,8 +4,8 @@
 The [**Stanek**](Multiprotocol/STANEK_nrf24l01.ino) protocol with the nRF24L01+ transceiver is included.
 Telemetry monitors receiver voltage A1(A2) and "fake" RSSI.
 The nRF24L01+ transceiver does not contain real RSSI and is only a rough counting of lost packets.
-* Setting the number of channels in the option selection (2 to 14 channels).
-* Fail-safe flag in bind option "Bnd".
+* By selecting the "Options" in the model settings menu, select the number of RC channels from 2 to 14.
+* By selecting the "Bnd" bind option in the model settings menu, we save the Fail-Safe servo positions to the receiver.
 
 Attention! To select protocols and build firmware, use Arduino IDE version 1.8.19. Compiling with Arduino IDE version 2... has errors (I will investigate later).
 
