@@ -8,7 +8,7 @@ Constant latency / period of 4.5 ms (222 Hz).
 The received telemetry displays the A1(A2) voltage and RSSI.
 
 * The bind "Bnd" function saves the Fail-Safe positions for the servos into the receiver.
-* Number of RC channels in the “Option” menu. Select a value from 2 to 14.
+* In the "Option" menu, enter the number of RC channels from 2 to 14.
 
 Support for DIY receivers from this repository: https://github.com/stanekTM/RX_nRF24_FHSS
 ***********************************************************************************************
