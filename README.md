@@ -7,7 +7,7 @@ Added simple RF protocol [**Stanek**](Multiprotocol/STANEK_nrf24l01.ino) with fr
 * Constant latency / period of 4.5 ms (222 Hz).
 * The received telemetry displays the A1(A2) voltage and RSSI.
 * The bind "Bnd" function saves the Fail-Safe positions for the servos into the receiver.
-* In the "Option" menu, enter the number of RC channels from 2 to 14.
+* In the "Option" menu, enter the number of channels that corresponds to the number of receiver outputs (from 2 to 14).
 
 Support for custom DIY RC receivers from this repository [**RX_nRF24_FHSS**](https://github.com/stanekTM/RX_nRF24_FHSS)
 
