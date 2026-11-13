@@ -1,4 +1,4 @@
-# Custom FHSS protocol for DIY-Multiprotocol-TX-Module
+# My FHSS protocol for DIY-Multiprotocol-TX-Module
 
 Added simple [**RF protocol**](Multiprotocol/STANEK_nrf24l01.ino) with frequency hopping (FHSS) and two-way telemetry (Auto-ACK Payload) for the nRF24L01+ transceiver.
 
